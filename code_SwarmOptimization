@@ -1,0 +1,78 @@
+import numpy as np
+import random
+
+# Objective function to calculate total distance of a route
+def calculate_total_distance(route, distance_matrix):
+    total_distance = 0
+    for i in range(len(route) - 1):
+        total_distance += distance_matrix[route[i], route[i+1]]
+    total_distance += distance_matrix[route[-1], route[0]]  # Returning to the start
+    return total_distance
+
+# Particle Swarm Optimization (PSO) for route optimization
+def pso_tsp(distance_matrix, num_particles=30, max_iter=100):
+    num_locations = distance_matrix.shape[0]
+    
+    # Initialize particle positions (routes) and velocities
+    particles = [np.random.permutation(num_locations) for _ in range(num_particles)]  # Random routes
+    velocities = [np.zeros(num_locations) for _ in range(num_particles)]  # Initial velocity
+    
+    # Best positions and scores (total distances)
+    personal_best_positions = particles.copy()
+    personal_best_scores = [calculate_total_distance(p, distance_matrix) for p in particles]
+    
+    # Global best
+    global_best_position = particles[np.argmin(personal_best_scores)]
+    global_best_score = min(personal_best_scores)
+    
+    # PSO parameters
+    w = 0.5  # Inertia weight
+    c1 = 1.5  # Cognitive coefficient
+    c2 = 1.5  # Social coefficient
+    
+    # PSO Iteration
+    for iteration in range(max_iter):
+        for i in range(num_particles):
+            # Update velocity
+            r1 = np.random.random(size=num_locations)
+            r2 = np.random.random(size=num_locations)
+            velocities[i] = (w * velocities[i] + 
+                             c1 * r1 * (personal_best_positions[i] - particles[i]) + 
+                             c2 * r2 * (global_best_position - particles[i]))
+            
+            # Update position
+            particles[i] = np.clip(particles[i] + velocities[i], 0, num_locations - 1).astype(int)  # Ensure valid indices
+            
+            # Evaluate new route
+            score = calculate_total_distance(particles[i], distance_matrix)
+            
+            # Update personal best
+            if score < personal_best_scores[i]:
+                personal_best_positions[i] = particles[i]
+                personal_best_scores[i] = score
+            
+        # Update global best
+        global_best_score = min(personal_best_scores)
+        global_best_position = personal_best_positions[np.argmin(personal_best_scores)]
+        
+        # Print progress
+        print(f"Iteration {iteration + 1}, Global Best Score: {global_best_score}")
+    
+    return global_best_position, global_best_score
+
+# Example usage: Sample distance matrix
+distance_matrix = np.array([
+    [0, 10, 15, 20, 25],
+    [10, 0, 35, 25, 30],
+    [15, 35, 0, 30, 5],
+    [20, 25, 30, 0, 15],
+    [25, 30, 5, 15, 0]
+])
+
+# Run PSO to find the best route
+best_route, best_score = pso_tsp(distance_matrix)
+
+# Output the result
+print("\nBest route found:")
+print(best_route)
+print(f"Best total distance: {best_score}")
