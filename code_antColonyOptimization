@@ -1,0 +1,100 @@
+import numpy as np
+import random
+
+# Define the graph as an adjacency matrix
+graph = [
+    [0, 2, 2, 5, 0],
+    [2, 0, 3, 0, 2],
+    [2, 3, 0, 2, 3],
+    [5, 0, 2, 0, 2],
+    [0, 2, 3, 2, 0]
+]
+
+# Parameters for ACO
+NUM_ANTS = 5           # Number of ants
+NUM_ITERATIONS = 100   # Number of iterations
+ALPHA = 1              # Importance of pheromone
+BETA = 2               # Importance of heuristic (distance)
+EVAPORATION_RATE = 0.5 # Rate of pheromone evaporation
+Q = 100                # Pheromone deposit factor
+
+# Initialize pheromones
+pheromones = np.ones((len(graph), len(graph)))
+
+# Heuristic information (1/distance)
+heuristics = np.zeros_like(graph, dtype=float)
+for i in range(len(graph)):
+    for j in range(len(graph)):
+        heuristics[i][j] = 1 / graph[i][j] if graph[i][j] > 0 else 0
+
+# Function to calculate the probability of moving to a node
+def calculate_transition_probabilities(current_node, visited, pheromones, heuristics):
+    probabilities = []
+    total = 0
+    for next_node in range(len(graph)):
+        if next_node not in visited and graph[current_node][next_node] > 0:
+            probability = (pheromones[current_node][next_node] ** ALPHA) * (heuristics[current_node][next_node] ** BETA)
+            probabilities.append((next_node, probability))
+            total += probability
+
+    # Normalize probabilities
+    if total > 0:
+        probabilities = [(node, prob / total) for node, prob in probabilities]
+    return probabilities
+
+# ACO main loop
+def ant_colony_optimization(graph, start_node, end_node):
+    global pheromones
+    best_path = None
+    best_path_length = float('inf')
+
+    for iteration in range(NUM_ITERATIONS):
+        all_paths = []
+        all_lengths = []
+
+        for ant in range(NUM_ANTS):
+            current_node = start_node
+            visited = [current_node]
+            path_length = 0
+
+            # Ant builds its path
+            while current_node != end_node:
+                probabilities = calculate_transition_probabilities(current_node, visited, pheromones, heuristics)
+                if not probabilities:
+                    break  # No valid path
+                next_node = random.choices(
+                    [node for node, _ in probabilities],
+                    weights=[prob for _, prob in probabilities]
+                )[0]
+                path_length += graph[current_node][next_node]
+                visited.append(next_node)
+                current_node = next_node
+
+            if current_node == end_node:
+                all_paths.append(visited)
+                all_lengths.append(path_length)
+                if path_length < best_path_length:
+                    best_path = visited
+                    best_path_length = path_length
+
+        # Update pheromones
+        pheromones = pheromones * (1 - EVAPORATION_RATE)  # Evaporation
+        for path, length in zip(all_paths, all_lengths):
+            pheromone_deposit = Q / length
+            for i in range(len(path) - 1):
+                pheromones[path[i]][path[i + 1]] += pheromone_deposit
+
+    return best_path, best_path_length
+
+# Run ACO
+start_node = 0  # Source
+end_node = 4    # Destination
+best_path, best_path_length = ant_colony_optimization(graph, start_node, end_node)
+
+print(f"Best Path: {best_path}")
+print(f"Path Length: {best_path_length}")
+
+
+#output
+#Best Path: [0, 1, 4]
+#Path Length: 4
