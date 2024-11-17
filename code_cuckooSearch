@@ -1,0 +1,79 @@
+import numpy as np
+import math  # Use the built-in math module for certain mathematical operations
+
+# Define the objective function for clustering
+def objective_function(centroids, data_points):
+    total_distance = 0.0
+    for point in data_points:
+        # Find the closest centroid for each data point
+        distances = np.linalg.norm(point - centroids, axis=1)
+        total_distance += np.min(distances)
+    return total_distance
+
+# Cuckoo search parameters
+num_nests = 25  # Number of nests (candidate solutions)
+num_clusters = 3  # Desired number of clusters
+num_iterations = 100  # Number of iterations
+pa = 0.25  # Probability of abandoning a nest
+
+# Initialize the population of nests (each nest represents a set of centroids)
+def initialize_population(num_nests, num_clusters, data_points):
+    nests = []
+    for _ in range(num_nests):
+        # Randomly choose cluster centroids from data points
+        random_indices = np.random.choice(len(data_points), num_clusters, replace=False)
+        centroids = data_points[random_indices]
+        nests.append(centroids)
+    return np.array(nests)
+
+# Levy flight function
+def levy_flight(Lambda):
+    sigma1 = math.pow(
+        (math.gamma(1 + Lambda) * math.sin(math.pi * Lambda / 2)) /
+        (math.gamma((1 + Lambda) / 2) * Lambda * math.pow(2, (Lambda - 1) / 2)),
+        1 / Lambda
+    )
+    u = np.random.normal(0, sigma1)
+    v = np.random.normal(0, 1)
+    step = u / math.pow(abs(v), 1 / Lambda)
+    return step
+
+# Cuckoo search algorithm
+def cuckoo_search(data_points):
+    # Initialize nests (candidate solutions)
+    nests = initialize_population(num_nests, num_clusters, data_points)
+    best_nest = nests[0]
+    best_score = objective_function(best_nest, data_points)
+
+    for iteration in range(num_iterations):
+        # Generate new solutions via Levy flights
+        for i in range(num_nests):
+            new_nest = nests[i] + levy_flight(1.5) * np.random.randn(num_clusters, data_points.shape[1])
+            new_score = objective_function(new_nest, data_points)
+
+            # Replace if the new solution is better
+            if new_score < objective_function(nests[i], data_points):
+                nests[i] = new_nest
+
+            # Update the best solution
+            if new_score < best_score:
+                best_nest = new_nest
+                best_score = new_score
+
+        # Abandon some nests with a probability `pa`
+        for i in range(num_nests):
+            if np.random.rand() < pa:
+                nests[i] = initialize_population(1, num_clusters, data_points)[0]
+
+        # Print the progress for each iteration
+        print(f"Iteration {iteration + 1}, Best Score: {best_score}")
+
+    return best_nest, best_score
+
+# Sample usage
+data_points = np.array([[1, 2], [2, 3], [3, 4], [8, 8], [9, 10], [10, 12]])  # Replace with your data points
+best_centroids, best_score = cuckoo_search(data_points)
+
+print("\nBest centroids found:")
+print(best_centroids)
+print("Best score:", best_score)
