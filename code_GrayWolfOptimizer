@@ -1,0 +1,93 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the fitness function (Otsu's method)
+# Updated fitness function
+def fitness_function(threshold, image):
+    """
+    Calculate the fitness value (Otsu's between-class variance) for a given threshold.
+    """
+    image_flat = image.ravel()
+    hist, _ = np.histogram(image_flat, bins=256, range=(0, 256))
+    
+    # Total number of pixels
+    total = image_flat.size
+    
+    # Split histogram at the threshold
+    weight_bg = np.sum(hist[:threshold]) / total  # Background weight
+    weight_fg = np.sum(hist[threshold:]) / total  # Foreground weight
+    
+    mean_bg = np.sum(np.arange(0, threshold) * hist[:threshold]) / (np.sum(hist[:threshold]) + 1e-10)  # Mean of background
+    mean_fg = np.sum(np.arange(threshold, 256) * hist[threshold:]) / (np.sum(hist[threshold:]) + 1e-10)  # Mean of foreground
+    
+    # Between-class variance
+    variance_between = weight_bg * weight_fg * (mean_bg - mean_fg) ** 2
+    return variance_between
+
+# Grey Wolf Optimizer (GWO)
+class GreyWolfOptimizer:
+    def __init__(self, num_wolves, max_iter, bounds, image):
+        self.num_wolves = num_wolves
+        self.max_iter = max_iter
+        self.bounds = bounds
+        self.image = image
+        self.alpha_pos = None
+        self.alpha_score = -np.inf
+        self.beta_pos = None
+        self.beta_score = -np.inf
+        self.delta_pos = None
+        self.delta_score = -np.inf
+        self.population = np.random.randint(bounds[0], bounds[1], size=(num_wolves, 1))
+
+    def optimize(self):
+        for iter in range(self.max_iter):
+            for i, wolf in enumerate(self.population):
+                fitness = fitness_function(wolf[0], self.image)
+
+                # Update alpha, beta, delta
+                if fitness > self.alpha_score:
+                    self.alpha_score, self.alpha_pos = fitness, wolf
+                elif fitness > self.beta_score:
+                    self.beta_score, self.beta_pos = fitness, wolf
+                elif fitness > self.delta_score:
+                    self.delta_score, self.delta_pos = fitness, wolf
+
+            # Update wolves' positions
+            a = 2 - 2 * iter / self.max_iter
+            for i in range(self.num_wolves):
+                A1, A2, A3 = a * (2 * np.random.random() - 1), a * (2 * np.random.random() - 1), a * (2 * np.random.random() - 1)
+                C1, C2, C3 = 2 * np.random.random(), 2 * np.random.random(), 2 * np.random.random()
+
+                D_alpha = abs(C1 * self.alpha_pos - self.population[i])
+                D_beta = abs(C2 * self.beta_pos - self.population[i])
+                D_delta = abs(C3 * self.delta_pos - self.population[i])
+
+                X1 = self.alpha_pos - A1 * D_alpha
+                X2 = self.beta_pos - A2 * D_beta
+                X3 = self.delta_pos - A3 * D_delta
+
+                self.population[i] = np.clip((X1 + X2 + X3) / 3, *self.bounds)
+
+        return self.alpha_pos
+
+# Load image
+image = cv2.imread("sun.jpg", cv2.IMREAD_GRAYSCALE)
+
+# Apply GWO for thresholding
+gwo = GreyWolfOptimizer(num_wolves=10, max_iter=50, bounds=(0, 255), image=image)
+optimal_threshold = gwo.optimize()
+
+# Segment the image using the optimal threshold
+_, segmented_image = cv2.threshold(image, int(optimal_threshold), 255, cv2.THRESH_BINARY)
+
+# Display results
+plt.figure(figsize=(12, 6))
+plt.subplot(1, 2, 1)
+plt.title("Original Image")
+plt.imshow(image, cmap="gray")
+
+plt.subplot(1, 2, 2)
+plt.title(f"Segmented Image (Threshold={int(optimal_threshold)})")
+plt.imshow(segmented_image, cmap="gray")
+plt.show()
