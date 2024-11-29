@@ -1,0 +1,76 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import time
+
+# Parameters
+road_length = 30      # Length of the road (number of cells)
+lanes = 2              # Number of lanes
+num_cars = 5         # Total number of cars
+max_speed = 5          # Maximum speed of a car
+time_steps = 30        # Number of simulation steps
+
+# Initialize the road as a grid
+road = np.full((lanes, road_length), -1)  # -1 represents empty cell
+
+# Initialize car positions and speeds
+car_positions = []
+car_speeds = []
+
+for i in range(num_cars):
+    while True:
+        lane = np.random.randint(0, lanes)
+        position = np.random.randint(0, road_length)
+        if road[lane, position] == -1:  # Place car if cell is empty
+            road[lane, position] = i
+            car_positions.append((lane, position))
+            car_speeds.append(np.random.randint(1, max_speed + 1))  # Random speed
+            break
+
+# Visualization function
+def display_road(road):
+    for lane in range(road.shape[0]):
+        line = ''.join(['🚗' if road[lane, i] != -1 else '.' for i in range(road.shape[1])])
+        print(line)
+    print('-' * road.shape[1])
+
+# Simulation
+for step in range(time_steps):
+    print(f"Time step {step + 1}")
+    display_road(road)
+
+    # Temporary road for the next state
+    new_road = np.full_like(road, -1)
+
+    # Update each car's position and speed
+    for car_id, (lane, position) in enumerate(car_positions):
+        if car_id == -1:
+            continue
+
+        # Current speed
+        speed = car_speeds[car_id]
+
+        # Check the road ahead
+        for s in range(1, speed + 1):
+            next_position = (position + s) % road_length
+            if road[lane, next_position] != -1:  # Car in the way
+                speed = s - 1
+                break
+
+        # Update speed (acceleration or deceleration)
+        car_speeds[car_id] = min(speed + 1, max_speed)
+
+        # Move car to the new position
+        new_position = (position + car_speeds[car_id]) % road_length
+
+        # Try lane change if possible
+        if np.random.rand() < 0.3:  # 30% chance of lane change attempt
+            target_lane = (lane + 1) % lanes
+            if road[target_lane, new_position] == -1 and new_road[target_lane, new_position] == -1:
+                lane = target_lane
+
+        new_road[lane, new_position] = car_id
+        car_positions[car_id] = (lane, new_position)
+
+    # Update the road
+    road = new_road
+    time.sleep(0.5)  # Pause for visualization
